@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3a30">
+<title>찬반 투표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --board: #1f3a30;
+    --board-deep: #162b23;
+    --chalk: #f1efe4;
+    --chalk-dim: rgba(241, 239, 228, .55);
+    --yes: #6ec6f5;
+    --yes-deep: #2f8fc4;
+    --no: #ff8f8a;
+    --no-deep: #d4544e;
+    --yellow: #f5d76e;
+    --display: 'Do Hyeon', 'Malgun Gothic', sans-serif;
+    --body: 'Gowun Dodum', 'Malgun Gothic', sans-serif;
+    --hand: 'Nanum Pen Script', 'Malgun Gothic', cursive;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(ellipse at 30% 10%, rgba(255,255,255,.06), transparent 60%),
+      var(--board);
+    color: var(--chalk);
+    font-family: var(--body);
+    min-height: 100dvh;
+    display: flex; flex-direction: column;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    overscroll-behavior: none;
+    user-select: none; -webkit-user-select: none;
+  }
+
+  .timebar { position: fixed; left: 0; top: 0; height: 6px; background: var(--yellow); width: 0; z-index: 2; }
+
+  header { text-align: center; padding: clamp(12px, 3vh, 36px) 8px clamp(16px, 3vh, 30px); }
+  .hand { font-family: var(--hand); color: var(--yellow); font-size: clamp(24px, 3.4vw, 34px); line-height: 1; display: block; margin-bottom: 8px; }
+  h1 {
+    font-family: var(--display); font-weight: 400; margin: 0 auto; max-width: 900px;
+    font-size: clamp(28px, 4.6vw, 52px); line-height: 1.25;
+  }
+
+  .choices {
+    flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 2.4vw, 28px);
+    max-width: 1100px; width: 100%; margin: 0 auto;
+  }
+  .choice {
+    font-family: var(--display); font-size: clamp(56px, 11vw, 140px);
+    border: 4px solid transparent; border-radius: 28px; cursor: pointer;
+    color: var(--board-deep);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    transition: transform .18s cubic-bezier(.2,.9,.3,1.3), opacity .25s, filter .25s, box-shadow .18s;
+    min-height: 240px; position: relative;
+  }
+  .choice small { font-family: var(--body); font-size: clamp(16px, 2vw, 22px); opacity: .75; }
+  .choice.yes { background: var(--yes); box-shadow: 0 10px 0 var(--yes-deep); }
+  .choice.no { background: var(--no); box-shadow: 0 10px 0 var(--no-deep); }
+  .choice:active:not(:disabled) { transform: translateY(8px); box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+  .choice:disabled { cursor: default; filter: grayscale(1) brightness(.55); opacity: .5; box-shadow: none; }
+
+  /* 고른 쪽 강조, 안 고른 쪽은 물러남 */
+  .choices.picked .choice { opacity: .38; transform: scale(.94); }
+  .choices.picked .choice.on { opacity: 1; transform: scale(1); border-color: var(--chalk); }
+  .choice .check {
+    position: absolute; top: 18px; right: 22px; width: 52px; height: 52px;
+    border-radius: 50%; background: var(--board-deep); color: var(--chalk);
+    display: grid; place-items: center; font-size: 30px;
+    transform: scale(0); transition: transform .3s cubic-bezier(.2,1.6,.4,1);
+  }
+  .choice.on .check { transform: scale(1); }
+
+  .note { text-align: center; min-height: 3.2em; padding-top: 18px; font-size: clamp(18px, 2.2vw, 22px); color: var(--chalk-dim); }
+  .note b { color: var(--chalk); font-weight: 400; font-family: var(--display); font-size: 1.15em; }
+
+  /* 대기 · 종료 안내 */
+  .overlay {
+    position: fixed; inset: 0; z-index: 3;
+    display: grid; place-items: center; text-align: center; padding: 24px;
+    background: rgba(22, 43, 35, .9);
+    opacity: 0; pointer-events: none; transition: opacity .35s;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .overlay .box { max-width: 640px; transform: translateY(16px); transition: transform .45s cubic-bezier(.2,.9,.3,1.2); }
+  .overlay.show .box { transform: none; }
+  .overlay h2 { font-family: var(--display); font-weight: 400; font-size: clamp(36px, 6vw, 64px); margin: 0 0 14px; }
+  .overlay p { margin: 0; font-size: clamp(18px, 2.4vw, 24px); color: var(--chalk-dim); line-height: 1.6; }
+  .overlay .mine { margin-top: 26px; font-family: var(--hand); font-size: clamp(28px, 4vw, 40px); color: var(--yellow); }
+  .eye { font-size: 64px; display: block; margin-bottom: 10px; animation: look 2.4s ease-in-out infinite; }
+  @keyframes look { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  .dots span { display: inline-block; animation: blink 1.4s infinite; }
+  .dots span:nth-child(2) { animation-delay: .2s; } .dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+
+  .conn { position: fixed; bottom: 10px; left: 0; right: 0; text-align: center; color: var(--no); font-size: 15px; display: none; z-index: 4; }
+  .conn.show { display: block; }
+
+  :focus-visible { outline: 3px solid var(--yellow); outline-offset: 4px; }
+
+  @media (max-width: 560px) {
+    .choices { grid-template-columns: 1fr; }
+    .choice { min-height: 160px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .eye, .dots span { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="timebar" id="timebar"></div>
+
+<header>
+  <span class="hand">논제</span>
+  <h1 id="topic">선생님이 논제를 준비하고 있어요</h1>
+</header>
+
+<div class="choices" id="choices">
+  <button class="choice yes" data-choice="yes" disabled>찬성<small>이 주장에 동의해요</small><span class="check" aria-hidden="true">✓</span></button>
+  <button class="choice no" data-choice="no" disabled>반대<small>이 주장에 동의하지 않아요</small><span class="check" aria-hidden="true">✓</span></button>
+</div>
+<div class="note" id="note" aria-live="polite"></div>
+
+<div class="overlay show" id="waiting">
+  <div class="box">
+    <h2>잠시 기다려 주세요<span class="dots"><span>.</span><span>.</span><span>.</span></span></h2>
+    <p>선생님이 투표를 시작하면 찬성·반대 버튼이 켜져요.</p>
+  </div>
+</div>
+
+<div class="overlay" id="ended">
+  <div class="box">
+    <span class="eye" aria-hidden="true">👀</span>
+    <h2>투표가 끝났어요</h2>
+    <p>앞쪽 선생님 화면에서 결과를 확인하세요.</p>
+    <div class="mine" id="mine"></div>
+  </div>
+</div>
+
+<div class="conn" id="conn">연결이 끊겼어요. 다시 연결하는 중…</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getDatabase, ref, onValue, set } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+import { firebaseConfig } from './firebase-config.js';
+
+const db = getDatabase(initializeApp(firebaseConfig));
+const $ = (id) => document.getElementById(id);
+const serverNow = () => Date.now() + clockOffset;
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+
+let clientId;
+try {
+  clientId = localStorage.getItem('voteClientId');
+  if (!clientId) { clientId = crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now(); localStorage.setItem('voteClientId', clientId); }
+} catch { clientId = String(Math.random()).slice(2) + Date.now(); }
+
+let state = null, clockOffset = 0, myChoice = null, myRound = -1, sending = false;
+const buttons = [...document.querySelectorAll('.choice')];
+const label = { yes: '찬성', no: '반대' };
+
+function restoreChoice(round) {
+  try { const saved = JSON.parse(sessionStorage.getItem('voteChoice') || 'null'); if (saved && saved.round === round) return saved.choice; } catch {}
+  return null;
+}
+function saveChoice() {
+  try { sessionStorage.setItem('voteChoice', JSON.stringify({ round: state.round, choice: myChoice })); } catch {}
+}
+
+buttons.forEach(btn => btn.addEventListener('click', async () => {
+  if (!state || state.phase !== 'voting' || sending) return;
+  const choice = btn.dataset.choice;
+  if (choice === myChoice) return;
+  sending = true;
+  try {
+    await withTimeout(set(ref(db, `votes/${state.round}/${clientId}`), choice), 6000);
+    myChoice = choice;
+    saveChoice();
+    if (navigator.vibrate) navigator.vibrate(30);
+    renderChoice();
+  } catch {
+    $('note').textContent = serverNow() > state.endsAt
+      ? '투표 시간이 끝나서 반영되지 않았어요.'
+      : '투표가 전달되지 않았어요. 인터넷 연결을 확인하고 다시 눌러 주세요.';
+  } finally { sending = false; }
+}));
+
+function renderChoice() {
+  $('choices').classList.toggle('picked', !!myChoice);
+  buttons.forEach(b => {
+    const on = b.dataset.choice === myChoice;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  if (state && state.phase === 'voting') {
+    $('note').innerHTML = myChoice
+      ? `<b>${label[myChoice]}</b>${myChoice === 'yes' ? '을' : '를'} 골랐어요. 시간이 끝나기 전까지는 바꿀 수 있어요.`
+      : '찬성 또는 반대를 눌러 주세요.';
+  }
+}
+
+function render() {
+  const s = state;
+  if (s.round !== myRound) { myRound = s.round; myChoice = restoreChoice(s.round); }
+
+  $('topic').textContent = s.topic || '선생님이 논제를 준비하고 있어요';
+  $('waiting').classList.toggle('show', s.phase === 'idle');
+  $('ended').classList.toggle('show', s.phase === 'result');
+  buttons.forEach(b => b.disabled = s.phase !== 'voting');
+
+  if (s.phase === 'result') {
+    $('mine').textContent = myChoice ? `나는 ${label[myChoice]}에 투표했어요` : '이번에는 투표하지 않았어요';
+  }
+  if (s.phase === 'idle') { myChoice = null; $('note').textContent = ''; }
+  renderChoice();
+}
+
+function loop() {
+  if (state && state.phase === 'voting') {
+    const left = Math.max(0, state.endsAt - serverNow());
+    $('timebar').style.width = (left / (state.duration * 1000) * 100) + '%';
+    if (left === 0 && !buttons[0].disabled) buttons.forEach(b => b.disabled = true);
+  } else $('timebar').style.width = '0';
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+onValue(ref(db, '.info/serverTimeOffset'), (snap) => { clockOffset = snap.val() || 0; });
+onValue(ref(db, '.info/connected'), (snap) => $('conn').classList.toggle('show', snap.val() === false));
+onValue(ref(db, 'session'), (snap) => {
+  state = snap.val() || { phase: 'idle', topic: '' };
+  render();
+});
+</script>
+</body>
+</html>

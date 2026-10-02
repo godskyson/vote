@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>찬반 투표 · 교사</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --board: #1f3a30;
+    --board-deep: #162b23;
+    --frame: #7a5235;
+    --frame-light: #9b6b46;
+    --chalk: #f1efe4;
+    --chalk-dim: rgba(241, 239, 228, .55);
+    --yes: #6ec6f5;
+    --yes-deep: #2f8fc4;
+    --no: #ff8f8a;
+    --no-deep: #d4544e;
+    --yellow: #f5d76e;
+    --display: 'Do Hyeon', 'Malgun Gothic', sans-serif;
+    --body: 'Gowun Dodum', 'Malgun Gothic', sans-serif;
+    --hand: 'Nanum Pen Script', 'Malgun Gothic', cursive;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #4a3322;
+    color: var(--chalk);
+    font-family: var(--body);
+    display: grid;
+    place-items: stretch;
+    padding: clamp(10px, 1.6vw, 22px);
+  }
+  /* 나무 액자 + 칠판 */
+  .board {
+    position: relative;
+    min-height: calc(100vh - 2 * clamp(10px, 1.6vw, 22px));
+    border-radius: 6px;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.06), transparent 60%),
+      radial-gradient(ellipse at 80% 90%, rgba(255,255,255,.04), transparent 55%),
+      var(--board);
+    box-shadow:
+      0 0 0 clamp(8px, 1.2vw, 16px) var(--frame),
+      0 0 0 calc(clamp(8px, 1.2vw, 16px) + 2px) var(--frame-light),
+      inset 0 0 120px rgba(0,0,0,.45);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  /* 지운 자국 같은 얼룩 */
+  .board::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(100deg, transparent 20%, rgba(255,255,255,.035) 24%, transparent 30%),
+      linear-gradient(80deg, transparent 58%, rgba(255,255,255,.03) 63%, transparent 70%);
+    pointer-events: none;
+  }
+  .tray {
+    position: absolute; left: 6%; right: 6%; bottom: 0; height: 10px;
+    background: var(--frame-light); border-radius: 3px 3px 0 0;
+  }
+  .tray::after {
+    content: ''; position: absolute; bottom: 10px; left: 12%;
+    width: 46px; height: 9px; border-radius: 4px; background: var(--chalk);
+    box-shadow: 70px 0 0 -1px var(--yellow), 120px 1px 0 -2px var(--no);
+  }
+
+  .screen { display: none; flex: 1; flex-direction: column; padding: clamp(24px, 4vw, 64px); position: relative; z-index: 1; }
+  .screen.active { display: flex; }
+
+  h1, h2 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacing: .01em; }
+  .hand { font-family: var(--hand); color: var(--yellow); font-size: clamp(26px, 2.6vw, 38px); line-height: 1; }
+
+  /* ---------- 1. 논제 입력 ---------- */
+  #setup { justify-content: center; max-width: 1100px; margin: 0 auto; width: 100%; }
+  #setup .hand { margin-bottom: 10px; }
+  #topicInput {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    border-bottom: 3px dashed var(--chalk-dim);
+    color: var(--chalk);
+    font-family: var(--display);
+    font-size: clamp(34px, 4.6vw, 64px);
+    line-height: 1.25;
+    padding: 8px 0 14px;
+    resize: none;
+    outline: none;
+    min-height: 2.6em;
+  }
+  #topicInput::placeholder { color: rgba(241,239,228,.28); }
+  #topicInput:focus { border-bottom-color: var(--yellow); }
+  .setup-row { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; margin-top: 34px; }
+  .chips { display: flex; gap: 8px; align-items: center; }
+  .chips span { color: var(--chalk-dim); margin-right: 6px; font-size: 18px; }
+  .chip {
+    font: inherit; font-size: 18px; color: var(--chalk);
+    background: transparent; border: 2px solid var(--chalk-dim);
+    border-radius: 999px; padding: 6px 16px; cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--chalk); color: var(--board); border-color: var(--chalk); }
+  .btn-start {
+    margin-left: auto;
+    font-family: var(--display); font-size: clamp(26px, 2.6vw, 34px);
+    color: var(--board-deep); background: var(--yellow);
+    border: 0; border-radius: 14px; padding: 14px 40px; cursor: pointer;
+    box-shadow: 0 6px 0 #b8982f;
+    transition: transform .12s, box-shadow .12s;
+  }
+  .btn-start:active { transform: translateY(5px); box-shadow: 0 1px 0 #b8982f; }
+  .btn-start:disabled { opacity: .4; cursor: not-allowed; }
+  .error { color: var(--no); min-height: 1.4em; margin-top: 12px; font-size: 18px; }
+
+  .join {
+    display: flex; gap: 22px; align-items: center;
+    margin-top: clamp(30px, 6vh, 70px);
+    padding-top: 22px; border-top: 2px solid rgba(241,239,228,.12);
+  }
+  #qr { background: var(--chalk); padding: 8px; border-radius: 8px; line-height: 0; }
+  #qr:empty { display: none; }
+  #qr img, #qr canvas { width: 112px; height: 112px; }
+  .join p { margin: 0; color: var(--chalk-dim); font-size: 18px; }
+  .join .url { font-family: var(--display); font-size: clamp(26px, 2.8vw, 40px); color: var(--chalk); margin-top: 4px; word-break: break-all; }
+
+  /* ---------- 2. 투표 / 3. 결과 공통 ---------- */
+  #arena { justify-content: space-between; gap: 20px; }
+  .topic-line { text-align: center; max-width: 1200px; margin: 0 auto; }
+  .topic-line .hand { display: block; margin-bottom: 8px; }
+  #arenaTopic { font-size: clamp(34px, 4.4vw, 66px); line-height: 1.2; }
+
+  .field { position: relative; width: 100%; max-width: 1400px; margin: 0 auto; }
+  .sides { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
+  .side { font-family: var(--display); line-height: 1; position: relative; }
+  .side .name { font-size: clamp(44px, 5.6vw, 92px); }
+  .side .pct { font-size: clamp(30px, 3.6vw, 58px); opacity: .9; font-variant-numeric: tabular-nums; }
+  .side .cnt { font-family: var(--body); font-size: clamp(16px, 1.5vw, 22px); color: var(--chalk-dim); margin-top: 6px; min-height: 1.3em; }
+  .side.yes { color: var(--yes); }
+  .side.no { color: var(--no); text-align: right; }
+  .side .row { display: flex; align-items: baseline; gap: 16px; }
+  .side.no .row { flex-direction: row-reverse; }
+
+  /* 찬반 줄다리기 막대 */
+  .bar {
+    position: relative; height: clamp(90px, 13vh, 150px);
+    border-radius: 18px; overflow: visible;
+  }
+  .bar .fill {
+    position: absolute; top: 0; bottom: 0;
+    background-size: 18px 18px;
+  }
+  .bar .fill.yes {
+    left: 0; border-radius: 18px 0 0 18px;
+    background-color: var(--yes-deep);
+    background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,.12) 0 6px, transparent 6px 14px);
+  }
+  .bar .fill.no {
+    right: 0; border-radius: 0 18px 18px 0;
+    background-color: var(--no-deep);
+    background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.12) 0 6px, transparent 6px 14px);
+  }
+  .bar.voting .fill { animation: crawl 1.2s linear infinite; }
+  @keyframes crawl { to { background-position: 36px 0; } }
+  .knot {
+    position: absolute; top: -18px; bottom: -18px; width: 0;
+    transform: translateX(-50%);
+  }
+  .knot::before {
+    content: ''; position: absolute; left: -4px; top: 0; bottom: 0; width: 8px;
+    background: var(--chalk); border-radius: 4px; box-shadow: 0 0 18px rgba(241,239,228,.5);
+  }
+  .knot::after {
+    content: ''; position: absolute; left: -16px; top: -12px; width: 32px; height: 32px;
+    border-radius: 50%; background: var(--yellow); box-shadow: 0 0 0 5px var(--board);
+  }
+  .center-mark {
+    position: absolute; left: 50%; top: -30px; bottom: -30px; width: 0;
+    border-left: 3px dashed rgba(241,239,228,.35);
+  }
+
+  .status { display: flex; align-items: center; justify-content: center; gap: clamp(20px, 4vw, 60px); }
+  .timer { position: relative; width: clamp(110px, 12vw, 170px); aspect-ratio: 1; }
+  .timer svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .timer circle { fill: none; stroke-width: 9; }
+  .timer .track { stroke: rgba(241,239,228,.14); }
+  .timer .prog { stroke: var(--yellow); stroke-linecap: round; transition: stroke .3s; }
+  .timer .num {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-family: var(--display); font-size: clamp(44px, 5vw, 72px); font-variant-numeric: tabular-nums;
+  }
+  .timer.hurry .num { color: var(--no); animation: thump 1s ease-out infinite; }
+  .timer.hurry .prog { stroke: var(--no); }
+  @keyframes thump { 0% { transform: scale(1.25); } 40% { transform: scale(1); } }
+  .meta { font-size: clamp(18px, 1.7vw, 24px); color: var(--chalk-dim); }
+  .meta b { font-family: var(--display); font-weight: 400; color: var(--chalk); font-size: 1.5em; margin: 0 4px; }
+
+  .controls { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  .ghost {
+    font: inherit; font-size: 18px; color: var(--chalk-dim);
+    background: transparent; border: 2px solid rgba(241,239,228,.25);
+    border-radius: 10px; padding: 8px 18px; cursor: pointer;
+  }
+  .ghost:hover { color: var(--chalk); border-color: var(--chalk-dim); }
+  .ghost.strong { color: var(--board-deep); background: var(--chalk); border-color: var(--chalk); }
+
+  /* 결과 */
+  .verdict {
+    text-align: center; font-family: var(--display);
+    font-size: clamp(40px, 5vw, 80px); min-height: 1.3em; position: relative;
+    opacity: 0; transform: scale(.6);
+  }
+  .verdict.show { animation: stamp .55s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+  @keyframes stamp { to { opacity: 1; transform: scale(1); } }
+  .verdict.yes { color: var(--yes); }
+  .verdict.no { color: var(--no); }
+  .verdict.tie { color: var(--yellow); }
+
+  /* 승리 쪽에 분필 동그라미 */
+  .chalk-ring { position: absolute; pointer-events: none; overflow: visible; }
+  .chalk-ring path {
+    fill: none; stroke: var(--yellow); stroke-width: 5; stroke-linecap: round;
+    stroke-dasharray: 1; stroke-dashoffset: 1;
+    filter: url(#rough);
+  }
+  .chalk-ring.draw path { animation: draw .9s ease-out forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  #arena[data-phase="voting"] .result-only { display: none; }
+  #arena[data-phase="result"] .voting-only { display: none; }
+
+  #dust { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+
+  .conn {
+    position: absolute; right: 18px; top: 14px; z-index: 3;
+    font-size: 15px; color: var(--no); display: none;
+  }
+  .conn.show { display: block; }
+
+  :focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+
+  @media (max-width: 720px) {
+    .btn-start { margin-left: 0; width: 100%; }
+    .join { flex-direction: column; align-items: flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar.voting .fill, .timer.hurry .num { animation: none; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3"/></filter>
+</svg>
+
+<main class="board">
+  <div class="conn" id="conn">서버와 연결이 끊겼어요. 다시 연결하는 중…</div>
+
+  <!-- 1. 논제 입력 -->
+  <section class="screen" id="setup" aria-labelledby="setupTitle">
+    <p class="hand" id="setupTitle">오늘의 논제</p>
+    <textarea id="topicInput" rows="2" maxlength="120" placeholder="예) 학교에서 휴대폰 사용을 허용해야 한다"></textarea>
+    <div class="setup-row">
+      <div class="chips" role="group" aria-label="투표 시간">
+        <span>투표 시간</span>
+        <button class="chip" data-sec="15" aria-pressed="false">15초</button>
+        <button class="chip" data-sec="30" aria-pressed="true">30초</button>
+        <button class="chip" data-sec="60" aria-pressed="false">60초</button>
+      </div>
+      <button class="btn-start" id="startBtn">투표 시작</button>
+    </div>
+    <div class="error" id="setupError" role="alert"></div>
+
+    <div class="join">
+      <div id="qr" aria-hidden="true"></div>
+      <div>
+        <p>학생 태블릿에서 이 주소로 들어오세요</p>
+        <div class="url" id="joinUrl">주소를 찾는 중…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 투표 중 / 3. 결과 -->
+  <section class="screen" id="arena" data-phase="voting">
+    <div class="topic-line">
+      <span class="hand voting-only">지금 투표 중이에요</span>
+      <span class="hand result-only">투표 결과</span>
+      <h1 id="arenaTopic"></h1>
+    </div>
+
+    <div class="field">
+      <div class="sides">
+        <div class="side yes" id="sideYes">
+          <div class="row"><span class="name">찬성</span><span class="pct" id="pctYes">?</span></div>
+          <div class="cnt" id="cntYes"></div>
+        </div>
+        <div class="side no" id="sideNo">
+          <div class="row"><span class="name">반대</span><span class="pct" id="pctNo">?</span></div>
+          <div class="cnt" id="cntNo"></div>
+        </div>
+      </div>
+      <div class="bar voting" id="bar">
+        <div class="fill yes" id="fillYes"></div>
+        <div class="fill no" id="fillNo"></div>
+        <div class="center-mark"></div>
+        <div class="knot" id="knot"></div>
+      </div>
+    </div>
+
+    <div class="voting-only status">
+      <div class="timer" id="timer">
+        <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="44"/><circle class="prog" id="timerProg" cx="50" cy="50" r="44"/></svg>
+        <div class="num" id="timerNum">30</div>
+      </div>
+      <div class="meta">지금까지 <b id="participants">0</b>명 참여</div>
+    </div>
+
+    <div class="result-only">
+      <div class="verdict" id="verdict" aria-live="polite"></div>
+    </div>
+
+    <div class="controls">
+      <button class="ghost voting-only" id="stopBtn">지금 마감하기</button>
+      <button class="ghost result-only" id="againBtn">같은 논제로 다시 투표</button>
+      <button class="ghost strong result-only" id="newBtn">새 논제 입력</button>
+    </div>
+  </section>
+
+  <div class="tray" aria-hidden="true"></div>
+</main>
+<canvas id="dust" aria-hidden="true"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getDatabase, ref, onValue, set, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+import { firebaseConfig } from './firebase-config.js';
+
+const db = getDatabase(initializeApp(firebaseConfig));
+const $ = (id) => document.getElementById(id);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let duration = 30;
+let state = null;
+let clockOffset = 0;
+let shownRound = null;
+let shownPhase = null;
+let finishing = false;
+
+/* ---------- 학생 접속 주소 (이 페이지와 같은 폴더의 index.html) ---------- */
+const joinUrl = new URL('./', location.href).href;
+$('joinUrl').textContent = joinUrl.replace(/^https?:\/\//, '');
+if (window.QRCode) new QRCode($('qr'), { text: joinUrl, width: 224, height: 224, colorDark: '#162b23', colorLight: '#f1efe4' });
+
+/* ---------- 입력 화면 ---------- */
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+    chip.setAttribute('aria-pressed', 'true');
+    duration = Number(chip.dataset.sec);
+  });
+});
+
+const serverNow = () => Date.now() + clockOffset;
+
+async function start(topic) {
+  $('setupError').textContent = '';
+  topic = topic.trim().slice(0, 120);
+  if (!topic) { $('setupError').textContent = '논제를 먼저 적어 주세요.'; $('topicInput').focus(); return; }
+  $('startBtn').disabled = true;
+  try {
+    await remove(ref(db, 'votes'));   // 지난 투표 기록 정리
+    await set(ref(db, 'session'), {
+      phase: 'voting',
+      round: String(serverNow()),
+      topic,
+      duration,
+      endsAt: serverNow() + duration * 1000,
+    });
+  } catch (e) {
+    $('setupError').textContent = 'Firebase에 저장하지 못했어요. firebase-config.js 값과 데이터베이스 규칙을 확인해 주세요.';
+    console.error(e);
+  } finally { $('startBtn').disabled = false; }
+}
+function finishVoting() {
+  if (finishing || !state || state.phase !== 'voting') return;
+  finishing = true;
+  update(ref(db, 'session'), { phase: 'result' }).finally(() => { finishing = false; });
+}
+$('startBtn').addEventListener('click', () => start($('topicInput').value));
+$('topicInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); start($('topicInput').value); }
+});
+$('stopBtn').addEventListener('click', finishVoting);
+$('againBtn').addEventListener('click', () => start(state ? state.topic : ''));
+$('newBtn').addEventListener('click', () => set(ref(db, 'session'), { phase: 'idle', topic: '' }));
+
+/* ---------- 실시간 연결 ---------- */
+// 표는 votes/{round}/{학생ID} = 'yes' | 'no' 로 쌓인다
+let tally = { round: null, loaded: false, yes: 0, no: 0 };
+let unsubVotes = null;
+
+function watchVotes(round) {
+  if (tally.round === round) return;
+  unsubVotes && unsubVotes();
+  tally = { round, loaded: false, yes: 0, no: 0 };
+  unsubVotes = onValue(ref(db, `votes/${round}`), (snap) => {
+    let yes = 0, no = 0;
+    snap.forEach((c) => { c.val() === 'yes' ? yes++ : no++; });
+    tally = { round, loaded: true, yes, no };
+    if (state) render();
+  });
+}
+
+onValue(ref(db, '.info/serverTimeOffset'), (snap) => { clockOffset = snap.val() || 0; });
+onValue(ref(db, '.info/connected'), (snap) => $('conn').classList.toggle('show', snap.val() === false));
+onValue(ref(db, 'session'), (snap) => {
+  state = snap.val() || { phase: 'idle', topic: '' };
+  if (state.round) watchVotes(state.round);
+  render();
+});
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+}
+
+function render() {
+  const s = state;
+  if (s.phase === 'idle') {
+    show('setup');
+    stopDust();
+    if (shownPhase !== 'idle') setTimeout(() => $('topicInput').focus(), 50);
+    shownPhase = 'idle';
+    return;
+  }
+  // 결과는 해당 회차 표를 다 받은 뒤에 공개
+  if (s.phase === 'result' && !(tally.round === s.round && tally.loaded)) return;
+  show('arena');
+  $('arenaTopic').textContent = s.topic;
+  $('participants').textContent = tally.round === s.round ? tally.yes + tally.no : 0;
+
+  if (s.phase === 'voting' && (shownPhase !== 'voting' || shownRound !== s.round)) beginVoting();
+  if (s.phase === 'result' && (shownPhase !== 'result' || shownRound !== s.round)) revealResult({ yes: tally.yes, no: tally.no });
+  shownPhase = s.phase;
+  shownRound = s.round;
+}
+
+/* ---------- 줄다리기 막대 물리 ---------- */
+// pos: 찬성 쪽 비율(0~1). 스프링으로 target을 따라간다.
+const sim = { pos: .5, vel: 0, target: .5, k: 10, damp: 4.5, mode: 'idle', nextTarget: 0, onSettle: null };
+let lastT = performance.now();
+let scramble = 0;
+
+function setBar(p) {
+  const pct = (p * 100).toFixed(2) + '%';
+  $('fillYes').style.width = pct;
+  $('fillNo').style.width = (100 - p * 100).toFixed(2) + '%';
+  $('knot').style.left = pct;
+}
+
+function tick(now) {
+  const dt = Math.min(.05, (now - lastT) / 1000);
+  lastT = now;
+
+  if (sim.mode === 'voting') {
+    const left = Math.max(0, state.endsAt - serverNow());
+    if (left === 0) finishVoting();
+    const hurry = left < 5000;
+    // 랜덤하게 이리저리 — 실제 투표와는 무관
+    if (now > sim.nextTarget) {
+      const swing = reduceMotion ? .08 : (hurry ? .42 : .34);
+      sim.target = .5 + (Math.random() * 2 - 1) * swing;
+      sim.nextTarget = now + (hurry ? 180 + Math.random() * 260 : 350 + Math.random() * 900);
+    }
+    sim.k = hurry ? 26 : 12;
+    sim.damp = hurry ? 5 : 4;
+    updateTimer(left);
+    scramble += dt;
+    if (scramble > .09) {
+      scramble = 0;
+      $('pctYes').textContent = randomPct();
+      $('pctNo').textContent = randomPct();
+    }
+  }
+
+  // 스프링
+  const acc = (sim.target - sim.pos) * sim.k - sim.vel * sim.damp;
+  sim.vel += acc * dt;
+  sim.pos += sim.vel * dt;
+  sim.pos = Math.min(.985, Math.max(.015, sim.pos));
+  setBar(sim.pos);
+
+  if (sim.mode === 'settling') {
+    if (Math.abs(sim.target - sim.pos) < .002 && Math.abs(sim.vel) < .004) {
+      sim.pos = sim.target; sim.vel = 0; setBar(sim.pos);
+      sim.mode = 'idle';
+      sim.onSettle && sim.onSettle();
+    }
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function randomPct() {
+  return Math.random() < .5 ? '??%' : Math.floor(Math.random() * 100) + '%';
+}
+
+const CIRC = 2 * Math.PI * 44;
+$('timerProg').style.strokeDasharray = CIRC;
+function updateTimer(left) {
+  const sec = Math.ceil(left / 1000);
+  if ($('timerNum').textContent !== String(sec)) $('timerNum').textContent = sec;
+  $('timerProg').style.strokeDashoffset = CIRC * (1 - left / (state.duration * 1000));
+  $('timer').classList.toggle('hurry', left < 5000 && left > 0);
+}
+
+function beginVoting() {
+  $('arena').dataset.phase = 'voting';
+  $('bar').classList.add('voting');
+  $('pctYes').style.opacity = $('pctNo').style.opacity = '.55';
+  $('cntYes').textContent = $('cntNo').textContent = '';
+  $('verdict').className = 'verdict';
+  $('verdict').textContent = '';
+  removeRings();
+  stopDust();
+  sim.mode = 'voting';
+  sim.nextTarget = 0;
+}
+
+/* ---------- 결과 공개 ---------- */
+function revealResult(r) {
+  $('arena').dataset.phase = 'result';
+  $('bar').classList.remove('voting');
+  $('timer').classList.remove('hurry');
+  const total = r.yes + r.no;
+  const ratio = total ? r.yes / total : .5;
+
+  // 1) 마지막으로 크게 흔들었다가  2) 실제 비율로 착지
+  sim.mode = 'drumroll';
+  $('pctYes').textContent = $('pctNo').textContent = '';
+  const swings = reduceMotion ? [] : [.18, .82, .3, .7];
+  let i = 0;
+  sim.k = 30; sim.damp = 6;
+  const step = () => {
+    if (i < swings.length) { sim.target = swings[i++]; setTimeout(step, 260); return; }
+    sim.k = 9; sim.damp = 3.2;          // 살짝 넘쳤다가 자리 잡는 착지
+    sim.target = Math.min(.985, Math.max(.015, ratio));
+    sim.mode = 'settling';
+    countUp(r, total, 1400);
+    sim.onSettle = () => announce(r, total);
+  };
+  step();
+}
+
+function countUp(r, total, ms) {
+  const t0 = performance.now();
+  $('pctYes').style.opacity = $('pctNo').style.opacity = '1';
+  const yesP = total ? Math.round(r.yes / total * 100) : 0;
+  const noP = total ? 100 - yesP : 0;
+  const frame = (now) => {
+    const k = Math.min(1, (now - t0) / ms);
+    const e = 1 - Math.pow(1 - k, 3);
+    $('pctYes').textContent = Math.round(yesP * e) + '%';
+    $('pctNo').textContent = Math.round(noP * e) + '%';
+    $('cntYes').textContent = Math.round(r.yes * e) + '표';
+    $('cntNo').textContent = Math.round(r.no * e) + '표';
+    if (k < 1) requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+
+function announce(r, total) {
+  const v = $('verdict');
+  if (!total) { v.textContent = '참여한 학생이 없어요'; v.className = 'verdict tie show'; return; }
+  if (r.yes === r.no) { v.textContent = `팽팽해요! ${r.yes} 대 ${r.no} 동점`; v.className = 'verdict tie show'; burst('tie'); return; }
+  const win = r.yes > r.no ? 'yes' : 'no';
+  v.textContent = `${win === 'yes' ? '찬성' : '반대'} 의견이 더 많아요 · 총 ${total}명`;
+  v.className = `verdict ${win} show`;
+  drawRing(win === 'yes' ? $('sideYes') : $('sideNo'));
+  burst(win);
+}
+
+/* 분필 동그라미 */
+function drawRing(el) {
+  removeRings();
+  const field = el.closest('.field');
+  const fr = field.getBoundingClientRect(), er = el.querySelector('.row').getBoundingClientRect();
+  const pad = 22;
+  const w = er.width + pad * 2, h = er.height + pad * 1.4;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'chalk-ring');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  Object.assign(svg.style, { left: (er.left - fr.left - pad) + 'px', top: (er.top - fr.top - pad * .7) + 'px', width: w + 'px', height: h + 'px' });
+  // 손으로 그린 듯 살짝 어긋나게 한 바퀴 반
+  const cx = w / 2, cy = h / 2, rx = w / 2 - 4, ry = h / 2 - 4;
+  let d = '';
+  for (let a = 0; a <= Math.PI * 2.25; a += .12) {
+    const wob = 1 + Math.sin(a * 3) * .025 + (a > Math.PI * 2 ? .05 : 0);
+    const x = cx + Math.cos(a - 2.2) * rx * wob, y = cy + Math.sin(a - 2.2) * ry * wob;
+    d += (d ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('pathLength', '1');
+  svg.appendChild(path);
+  field.appendChild(svg);
+  requestAnimationFrame(() => svg.classList.add('draw'));
+}
+function removeRings() { document.querySelectorAll('.chalk-ring').forEach(n => n.remove()); }
+
+/* ---------- 분필 가루 ---------- */
+const cv = $('dust'), ctx = cv.getContext('2d');
+let parts = [], dustOn = false;
+function resize() { cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; }
+addEventListener('resize', resize); resize();
+
+function burst(side) {
+  if (reduceMotion) return;
+  const colors = side === 'yes' ? ['#6ec6f5', '#f1efe4', '#f5d76e']
+               : side === 'no' ? ['#ff8f8a', '#f1efe4', '#f5d76e']
+               : ['#6ec6f5', '#ff8f8a', '#f5d76e'];
+  const knot = $('knot').getBoundingClientRect();
+  const ox = side === 'yes' ? innerWidth * .2 : side === 'no' ? innerWidth * .8 : knot.left;
+  const oy = knot.top + knot.height / 2;
+  for (let i = 0; i < 160; i++) {
+    const a = -Math.PI / 2 + (Math.random() - .5) * Math.PI * 1.3;
+    const sp = 6 + Math.random() * 14;
+    parts.push({
+      x: ox + (Math.random() - .5) * 120, y: oy,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      r: 2 + Math.random() * 5, life: 1, decay: .006 + Math.random() * .01,
+      c: colors[i % colors.length], rot: Math.random() * 6, vr: (Math.random() - .5) * .3,
+    });
+  }
+  if (!dustOn) { dustOn = true; requestAnimationFrame(drawDust); }
+}
+function drawDust() {
+  const d = devicePixelRatio;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  parts = parts.filter(p => p.life > 0);
+  for (const p of parts) {
+    p.vy += .35; p.vx *= .985; p.vy *= .985;
+    p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= p.decay;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.c;
+    ctx.translate(p.x * d, p.y * d); ctx.rotate(p.rot);
+    ctx.fillRect(-p.r * d, -p.r * d * .6, p.r * 2 * d, p.r * 1.2 * d);
+    ctx.restore();
+  }
+  if (parts.length) requestAnimationFrame(drawDust);
+  else { dustOn = false; ctx.clearRect(0, 0, cv.width, cv.height); }
+}
+function stopDust() { parts = []; }
+</script>
+</body>
+</html>

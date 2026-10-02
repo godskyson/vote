@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "session": {
+      ".read": true,
+      ".write": true
+    },
+    "votes": {
+      ".read": true,
+      ".write": "!newData.exists()",
+      "$round": {
+        "$clientId": {
+          ".write": "root.child('session/phase').val() === 'voting' && root.child('session/round').val() === $round && now <= root.child('session/endsAt').val()",
+          ".validate": "newData.isString() && (newData.val() === 'yes' || newData.val() === 'no') && $clientId.length <= 64"
+        }
+      }
+    }
+  }
+}
