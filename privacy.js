@@ -1,10 +1,10 @@
 // 개인정보 처리방침: 화면 오른쪽 아래 작은 버튼 + 팝업
 // 학교명·보호책임자 정보는 아래 값만 고치면 된다.
 const PRIVACY = {
-  org: '[학교명]',
-  officerName: '[성명]',
-  officerRole: '정보 교사 (서비스 운영 담당)',
-  officerContact: '[연락처 또는 이메일]',
+  org: '대영중학교',
+  officerName: '왕현우',
+  officerRole: '대영중학교 교사',
+  officerContact: 'king03603@gmail.com',
   effective: '2026년 10월 2일',
 };
 
