@@ -2,11 +2,11 @@
   "rules": {
     "session": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null && auth.token.email === 'teacher@classvote.app'"
     },
     "votes": {
       ".read": true,
-      ".write": "!newData.exists()",
+      ".write": "auth != null && auth.token.email === 'teacher@classvote.app' && !newData.exists()",
       "$round": {
         "$clientId": {
           ".write": "root.child('session/phase').val() === 'voting' && root.child('session/round').val() === $round && now <= root.child('session/endsAt').val()",

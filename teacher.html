@@ -77,8 +77,13 @@
   .hand { font-family: var(--hand); color: var(--yellow); font-size: clamp(26px, 2.6vw, 38px); line-height: 1; }
 
   /* ---------- 1. 논제 입력 ---------- */
-  #setup { justify-content: center; max-width: 1100px; margin: 0 auto; width: 100%; }
-  #setup .hand { margin-bottom: 10px; }
+  /* 왼쪽 1/3: 학생 접속 QR, 오른쪽 2/3: 논제 입력 */
+  #setup.active {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: center; gap: clamp(28px, 4vw, 64px);
+  }
+  .compose { min-width: 0; }
+  .compose .hand { margin-bottom: 10px; }
   #topicInput {
     width: 100%;
     background: transparent;
@@ -117,15 +122,39 @@
   .error { color: var(--no); min-height: 1.4em; margin-top: 12px; font-size: 18px; }
 
   .join {
-    display: flex; gap: 22px; align-items: center;
-    margin-top: clamp(30px, 6vh, 70px);
-    padding-top: 22px; border-top: 2px solid rgba(241,239,228,.12);
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 18px;
+    padding-right: clamp(28px, 4vw, 64px);
+    border-right: 3px dashed rgba(241,239,228,.18);
+    height: 100%; justify-content: center;
   }
-  #qr { background: var(--chalk); padding: 8px; border-radius: 8px; line-height: 0; }
+  #qr {
+    width: 100%; max-width: min(100%, 62vh); aspect-ratio: 1;
+    background: var(--chalk); padding: 5%; border-radius: 14px; line-height: 0;
+  }
   #qr:empty { display: none; }
-  #qr img, #qr canvas { width: 112px; height: 112px; }
-  .join p { margin: 0; color: var(--chalk-dim); font-size: 18px; }
-  .join .url { font-family: var(--display); font-size: clamp(26px, 2.8vw, 40px); color: var(--chalk); margin-top: 4px; word-break: break-all; }
+  #qr img, #qr canvas { width: 100% !important; height: 100% !important; image-rendering: pixelated; }
+  .join p { margin: 0; color: var(--chalk-dim); font-size: clamp(17px, 1.5vw, 22px); }
+  .join .url { font-family: var(--display); font-size: clamp(20px, 2vw, 32px); color: var(--chalk); word-break: break-all; }
+  .lock-btn {
+    position: absolute; right: 18px; top: 14px; z-index: 3;
+    font: inherit; font-size: 15px; color: var(--chalk-dim);
+    background: transparent; border: 0; cursor: pointer; padding: 6px 10px;
+  }
+  .lock-btn:hover { color: var(--chalk); }
+
+  /* ---------- 0. 관리자 확인 ---------- */
+  #login { align-items: center; justify-content: center; text-align: center; }
+  #login h2 { font-size: clamp(40px, 5vw, 72px); margin: 6px 0 30px; }
+  .pin-form { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  #pinInput {
+    width: 5.2em; text-align: center; letter-spacing: .35em; padding-left: .35em;
+    font-family: var(--display); font-size: clamp(54px, 7vw, 92px);
+    color: var(--chalk); background: transparent; border: 0;
+    border-bottom: 4px dashed var(--chalk-dim); outline: none;
+  }
+  #pinInput:focus { border-bottom-color: var(--yellow); }
+  #pinInput.shake { animation: shake .4s; border-bottom-color: var(--no); }
+  @keyframes shake { 20%, 60% { transform: translateX(-10px); } 40%, 80% { transform: translateX(10px); } }
 
   /* ---------- 2. 투표 / 3. 결과 공통 ---------- */
   #arena { justify-content: space-between; gap: 20px; }
@@ -244,7 +273,9 @@
 
   @media (max-width: 720px) {
     .btn-start { margin-left: 0; width: 100%; }
-    .join { flex-direction: column; align-items: flex-start; }
+    #setup.active { grid-template-columns: 1fr; }
+    .join { order: 2; padding-right: 0; border-right: 0; }
+    #qr { max-width: 260px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .bar.voting .fill, .timer.hurry .num { animation: none; }
@@ -259,28 +290,40 @@
 <main class="board">
   <div class="conn" id="conn">서버와 연결이 끊겼어요. 다시 연결하는 중…</div>
 
+  <!-- 0. 관리자 확인 -->
+  <section class="screen" id="login" aria-labelledby="loginTitle">
+    <p class="hand">선생님 화면이에요</p>
+    <h2 id="loginTitle">관리자 비밀번호를 입력하세요</h2>
+    <form class="pin-form" id="pinForm">
+      <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="관리자 비밀번호">
+      <button class="btn-start" id="pinBtn" type="submit">확인</button>
+    </form>
+    <div class="error" id="pinError" role="alert"></div>
+  </section>
+
   <!-- 1. 논제 입력 -->
   <section class="screen" id="setup" aria-labelledby="setupTitle">
-    <p class="hand" id="setupTitle">오늘의 논제</p>
-    <textarea id="topicInput" rows="2" maxlength="120" placeholder="예) 학교에서 휴대폰 사용을 허용해야 한다"></textarea>
-    <div class="setup-row">
-      <div class="chips" role="group" aria-label="투표 시간">
-        <span>투표 시간</span>
-        <button class="chip" data-sec="15" aria-pressed="false">15초</button>
-        <button class="chip" data-sec="30" aria-pressed="true">30초</button>
-        <button class="chip" data-sec="60" aria-pressed="false">60초</button>
-      </div>
-      <button class="btn-start" id="startBtn">투표 시작</button>
-    </div>
-    <div class="error" id="setupError" role="alert"></div>
-
     <div class="join">
+      <p>태블릿 카메라로 찍어서 들어오세요</p>
       <div id="qr" aria-hidden="true"></div>
-      <div>
-        <p>학생 태블릿에서 이 주소로 들어오세요</p>
-        <div class="url" id="joinUrl">주소를 찾는 중…</div>
-      </div>
+      <div class="url" id="joinUrl"></div>
     </div>
+
+    <div class="compose">
+      <p class="hand" id="setupTitle">오늘의 논제</p>
+      <textarea id="topicInput" rows="3" maxlength="120" placeholder="예) 학교에서 휴대폰 사용을 허용해야 한다"></textarea>
+      <div class="setup-row">
+        <div class="chips" role="group" aria-label="투표 시간">
+          <span>투표 시간</span>
+          <button class="chip" data-sec="15" aria-pressed="false">15초</button>
+          <button class="chip" data-sec="30" aria-pressed="true">30초</button>
+          <button class="chip" data-sec="60" aria-pressed="false">60초</button>
+        </div>
+        <button class="btn-start" id="startBtn">투표 시작</button>
+      </div>
+      <div class="error" id="setupError" role="alert"></div>
+    </div>
+    <button class="lock-btn" id="lockBtn">잠그기</button>
   </section>
 
   <!-- 2. 투표 중 / 3. 결과 -->
@@ -337,23 +380,67 @@
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getDatabase, ref, onValue, set, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { firebaseConfig } from './firebase-config.js';
 
-const db = getDatabase(initializeApp(firebaseConfig));
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
 const $ = (id) => document.getElementById(id);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let duration = 30;
-let state = null;
+let state = { phase: 'idle', topic: '' };
 let clockOffset = 0;
 let shownRound = null;
 let shownPhase = null;
 let finishing = false;
+let authed = false;
+
+/* ---------- 관리자 확인 ----------
+   Firebase Authentication의 교사 계정으로 로그인한다.
+   Firebase 비밀번호는 6자 이상이어야 해서, 입력한 숫자 뒤에 고정 문자열을 붙여 보낸다.
+   실제로 막아 주는 것은 Firebase 데이터베이스 규칙(교사 계정만 session 쓰기 가능)이다. */
+const TEACHER_EMAIL = 'teacher@classvote.app';
+const toPassword = (pin) => `${pin}-classvote`;
+setPersistence(auth, browserSessionPersistence);   // 브라우저를 닫으면 다시 비밀번호를 묻는다
+
+onAuthStateChanged(auth, (user) => {
+  authed = !!user && user.email === TEACHER_EMAIL;
+  if (!authed) shownPhase = null;
+  render();
+});
+
+$('pinForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pin = $('pinInput').value.trim();
+  if (!pin) return;
+  $('pinBtn').disabled = true;
+  $('pinError').textContent = '';
+  try {
+    await signInWithEmailAndPassword(auth, TEACHER_EMAIL, toPassword(pin));
+    $('pinInput').value = '';
+  } catch (err) {
+    const msg = {
+      'auth/invalid-credential': '비밀번호가 맞지 않아요.',
+      'auth/wrong-password': '비밀번호가 맞지 않아요.',
+      'auth/invalid-login-credentials': '비밀번호가 맞지 않아요.',
+      'auth/user-not-found': 'Firebase에 교사 계정이 아직 없어요.',
+      'auth/too-many-requests': '여러 번 틀려서 잠시 잠겼어요. 몇 분 뒤에 다시 시도해 주세요.',
+      'auth/operation-not-allowed': 'Firebase에서 이메일/비밀번호 로그인을 켜 주세요.',
+      'auth/network-request-failed': '인터넷 연결을 확인해 주세요.',
+    }[err.code] || `로그인하지 못했어요. (${err.code || err.message})`;
+    $('pinError').textContent = msg;
+    $('pinInput').classList.remove('shake'); void $('pinInput').offsetWidth; $('pinInput').classList.add('shake');
+    $('pinInput').select();
+  } finally { $('pinBtn').disabled = false; }
+});
+$('lockBtn').addEventListener('click', () => signOut(auth));
 
 /* ---------- 학생 접속 주소 (이 페이지와 같은 폴더의 index.html) ---------- */
 const joinUrl = new URL('./', location.href).href;
-$('joinUrl').textContent = joinUrl.replace(/^https?:\/\//, '');
-if (window.QRCode) new QRCode($('qr'), { text: joinUrl, width: 224, height: 224, colorDark: '#162b23', colorLight: '#f1efe4' });
+$('joinUrl').textContent = joinUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+if (window.QRCode) new QRCode($('qr'), { text: joinUrl, width: 600, height: 600, colorDark: '#162b23', colorLight: '#f1efe4', correctLevel: QRCode.CorrectLevel.M });
 
 /* ---------- 입력 화면 ---------- */
 document.querySelectorAll('.chip').forEach(chip => {
@@ -429,6 +516,12 @@ function show(id) {
 
 function render() {
   const s = state;
+  if (!authed) {
+    show('login');
+    sim.mode = 'idle';
+    setTimeout(() => $('pinInput').focus(), 50);
+    return;
+  }
   if (s.phase === 'idle') {
     show('setup');
     stopDust();
