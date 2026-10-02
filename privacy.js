@@ -1,7 +1,7 @@
 // 개인정보 처리방침: 화면 오른쪽 아래 작은 버튼 + 팝업
 // 서비스 이름·보호책임자 정보는 아래 값만 고치면 된다.
 const PRIVACY = {
-  name: '너의 이름은',
+  name: '너의 의견은',
   officerName: '왕현우',
   officerRole: '대영중학교 교사',
   officerContact: 'king03603@gmail.com',
